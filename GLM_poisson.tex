@@ -1,3 +1,50 @@
-\documentclass[12pt, twoside, a4paper]{article}
+\documentclass{article}
+\topmargin -15mm
+\textheight 24truecm   
+\textwidth 16truecm    
+\oddsidemargin 5mm
+\evensidemargin 5mm   
+\setlength\parskip{10pt}
+\pagestyle{empty}          
+\usepackage{boxedminipage}
+\usepackage{amsfonts}
+\usepackage{amsmath} 
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{t1enc}
+\usepackage[utf8]{inputenc}
+\usepackage{amssymb}
+\usepackage{tikz}
+\usepackage{commath}
+\usepackage{listings}
+\usepackage{verbatim}
+\usepackage[margin=1in]{geometry}
+\usepackage{caption}
+\usepackage{subcaption}
+\newcommand*\diff{\mathop{}\!\mathrm{d}}
+\renewcommand{\thesubsection}{\thesection.\alph{subsection}}
+
+\title{Assignment II - Generalized Linear Models}
+\author{Filip Schjerven, Håkon Verås}
+\date{\today}
+
 \begin{document}
+
+\maketitle
+\begin{abstract}
+In this project we have created a R-package called myglm and used it to discuss and analyze the salary-dataset. This involves implementing the print-, anova-, summary- and the myglm(...)-functions, similarly to the lm-package.
+\end{abstract}
+\newpage
+
+\section{}
+
+\subsection{}
+The factor "age" differs from the other factors in the way that is a grouped binary factor and has a natural increase in mortality rate. The coefficients in "smoking status" is not measured by the model, but the exposure for each level is considered beforehand.
+
+\subsection{}
+
+
+\section{}
+\subsection{}
+
 \end{document}
