@@ -39,10 +39,39 @@ In this project we have created a R-package called myglm and used it to discuss 
 \section{}
 
 \subsection{}
-The factor "age" differs from the other factors in the way that is a grouped binary factor and has a natural increase in mortality rate. The coefficients in "smoking status" is not measured by the model, but the exposure for each level is considered beforehand.
+The factor "age" differs from the other factors in the way that is a grouped binary factor and has a natural increase in mortality rate. The coefficients in "age" is not measured by the model, but the exposure for each level is considered beforehand.
 
 \subsection{}
+We have that
+\begin{equation*}
+Y_{i} \sim \text{Po}(\mu_{i}),
+\end{equation*}
+so we have that
+\begin{equation*}
+	L(y_{1},...,y_{n}|\mu_{i}) = \prod_{j=1}^{n} P(Y_{i} = y_{j}) = \prod_{j=1}^{n} \frac{e^{-\mu_{i}}\mu_{i}^{y_{j}}}{y_{j}!} = \frac{e^{-n\mu_{i}} \mu_{i}^{\sum_{j=1}^{n} y_{j}} }{\prod_{j=1}^{n} y_{j}!}.
+\end{equation*}
+Then
+\begin{equation*}
+\text{log}(L) = -n\mu_{i} + \left(\sum_{j=1}^{n} y_{j}\right)\text{log} (\mu_{i}) - \sum_{j = 1}^{n} \text{log}(y_{j}!)
+\end{equation*}
+\begin{equation*}
+= -n\mu_{i} + \left(\sum_{j=1}^{n} y_{j}\right)(\text{offset}_{i} + \nu_{i}) - \sum_{j = 1}^{n} \text{log}(y_{j}!)
+\end{equation*}
+\begin{equation*}
+= -n\mu_{i} + \left(\sum_{j=1}^{n} y_{j}\right)(\text{offset}_{i} + \boldsymbol{x_{i} \beta}) - \sum_{j = 1}^{n} \text{log}(y_{j}!)
+\end{equation*}
+Resonnementet og påfølgende likninger er jeg litt usikre på.
+\begin{equation*}
+\nu_{i} = \boldsymbol{x_{i} \beta}
+\end{equation*}
+\begin{equation*}
+\text{log}(\mu_{i}) = \text{offset}_{i} + \nu_{i}
+\end{equation*}
+\begin{equation*}
+\text{log}(\mu_{i}) = \boldsymbol{x_{i} \beta}
+\end{equation*}
 
+\begin{equation}
 
 \section{}
 \subsection{}
