@@ -50,6 +50,21 @@ so the Likelihood-function of $\mu_{i}$ is
 \begin{equation*}
 	L(y_{1},...,y_{n}|\mu_{i}) = \prod_{j=1}^{n} P(Y_{i} = y_{j}) = \prod_{j=1}^{n} \frac{e^{-\mu_{i}}\mu_{i}^{y_{j}}}{y_{j}!} = \frac{e^{-n\mu_{i}} \mu_{i}^{\sum_{j=1}^{n} y_{j}} }{\prod_{j=1}^{n} y_{j}!}.
 \end{equation*}
+Since we are modelling the log-mortality, we consider a generalized linear model with link log. We therefore have that
+\begin{equation*}
+\text{log}(\mu_{i}) = \text{offset}_{i} + \nu_{i} = \text{offset}_{i} + \boldsymbol{x_{i} \beta},
+\end{equation*}
+and
+\begin{equation*}
+\mu_{i} = \text{exp}(\text{offset}_{i} + \boldsymbol{x_{i} \beta}).
+\end{equation*}
+It follows that
+\begin{equation*}
+L(y_{1},...,y_{n}|\boldsymbol{\beta}) = \frac{\text{exp}\left(-n \cdot \text{exp}(\text{offset}_{i} + \boldsymbol{x_{i}\beta}) + \left(\text{offset}_{i} + \boldsymbol{x_{i}\beta}\right) \sum_{j=1}^{n}y_{j} \right)}{\prod_{j=1}^{n} y_{j}!}.
+\end{equation*}
+
+
+\begin{comment}
 Further, the log-likelihood function can also be derived:
 \begin{equation*}
 \text{log}(L) = -n\mu_{i} + \left(\sum_{j=1}^{n} y_{j}\right)\text{log} (\mu_{i}) - \sum_{j = 1}^{n} \text{log}(y_{j}!)
@@ -70,8 +85,7 @@ Resonnementet og påfølgende likninger er jeg litt usikre på.
 \begin{equation*}
 \text{log}(\mu_{i}) = \boldsymbol{x_{i} \beta}
 \end{equation*}
-
+\end{comment}
 \section{}
 \subsection{}
-
 \end{document}
