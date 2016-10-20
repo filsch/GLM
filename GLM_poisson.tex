@@ -39,7 +39,7 @@ In this project we have created a R-package called myglm and used it to discuss 
 \section{}
 
 \subsection{}
-Since we like to study how the mortality rate due to lung cancer varies with smoking status, we want to model external factors as an offset. The factor "age" differs from the other factors in the way people has a natural increase in mortality rate when they get older. We therefore want to model "age" as an offset, so that it gives a natural increase in mortality for older people and doesn't add bias to other covariates.
+One usually consider an offset when are dealing with an factor with \textit{known} slope. In our case we are studying the mortality rate due to lung cancer. It is then natural to consider the population-factor as an offset; If the population increases by a factor $a$, then one would obviously also expect that the number of deaths also increase by a factor $a$.
 
 \subsection{}
 We have that
