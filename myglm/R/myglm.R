@@ -1,5 +1,6 @@
-myglm = function(formula, data = list(), ...){
+myglm = function(formula, data = list(), family, ...){
   # Extract model matrix & responses
+  if(family == "gaussian"){
   mf = model.frame(formula = formula, data = data)
   X  = model.matrix(attr(mf, "terms"), data = mf)
   y  = model.response(mf)
@@ -29,6 +30,10 @@ myglm = function(formula, data = list(), ...){
   class(est) = 'myglm'
   # Return the object with all results
   return(est)
+  }
+  else if(family == "poisson"){
+
+  }
 }
 
 print.myglm = function(x, ...){
