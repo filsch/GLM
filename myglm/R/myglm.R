@@ -1,11 +1,11 @@
 myglm = function(formula, data = list(), family, ...){
   # Extract model matrix & responses
-  if(family == "gaussian"){
   mf = model.frame(formula = formula, data = data)
   X  = model.matrix(attr(mf, "terms"), data = mf)
   y  = model.response(mf)
   terms = attr(mf, "terms")
 
+  if(family == "gaussian"){
   if (attr(terms,"intercept") == 1){
     rss_null <- t(y-mean(y))%*%(y-mean(y))
     p = ncol(X) - 1
@@ -33,6 +33,9 @@ myglm = function(formula, data = list(), family, ...){
   }
   else if(family == "poisson"){
 
+    est$call = match.call()
+    est$formula = formula
+    class(est) = 'myglm'
   }
 }
 
