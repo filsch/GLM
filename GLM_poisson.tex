@@ -39,18 +39,33 @@ In this project we have created a R-package called myglm and used it to discuss 
 \section{}
 
 \subsection{}
-The factor "age" differs from the other factors in the way that is a grouped binary factor and has a natural increase in mortality rate. The coefficients in "age" is not measured by the model, but the exposure for each level is considered beforehand.
+One usually consider an offset when are dealing with an factor with \textit{known} slope. In our case we are studying the mortality rate due to lung cancer. It is then natural to consider the population-factor as an offset; If the population increases by a factor $a$, then one would obviously also expect that the number of deaths also increase by a factor $a$.
 
 \subsection{}
 We have that
 \begin{equation*}
 Y_{i} \sim \text{Po}(\mu_{i}),
 \end{equation*}
-so we have that
+so the Likelihood-function of $\mu_{i}$ is
 \begin{equation*}
 	L(y_{1},...,y_{n}|\mu_{i}) = \prod_{j=1}^{n} P(Y_{i} = y_{j}) = \prod_{j=1}^{n} \frac{e^{-\mu_{i}}\mu_{i}^{y_{j}}}{y_{j}!} = \frac{e^{-n\mu_{i}} \mu_{i}^{\sum_{j=1}^{n} y_{j}} }{\prod_{j=1}^{n} y_{j}!}.
 \end{equation*}
-Then
+Since we are modelling the log-mortality, we consider a generalized linear model with link log. We therefore have that
+\begin{equation*}
+\text{log}(\mu_{i}) = \text{offset}_{i} + \nu_{i} = \text{offset}_{i} + \boldsymbol{x_{i} \beta},
+\end{equation*}
+and
+\begin{equation*}
+\mu_{i} = \text{exp}(\text{offset}_{i} + \boldsymbol{x_{i} \beta}).
+\end{equation*}
+It follows that
+\begin{equation*}
+L(y_{1},...,y_{n}|\boldsymbol{\beta}) = \frac{\text{exp}\left(-n \cdot \text{exp}(\text{offset}_{i} + \boldsymbol{x_{i}\beta}) + \left(\text{offset}_{i} + \boldsymbol{x_{i}\beta}\right) \sum_{j=1}^{n}y_{j} \right)}{\prod_{j=1}^{n} y_{j}!}.
+\end{equation*}
+
+
+\begin{comment}
+Further, the log-likelihood function can also be derived:
 \begin{equation*}
 \text{log}(L) = -n\mu_{i} + \left(\sum_{j=1}^{n} y_{j}\right)\text{log} (\mu_{i}) - \sum_{j = 1}^{n} \text{log}(y_{j}!)
 \end{equation*}
@@ -70,10 +85,7 @@ Resonnementet og påfølgende likninger er jeg litt usikre på.
 \begin{equation*}
 \text{log}(\mu_{i}) = \boldsymbol{x_{i} \beta}
 \end{equation*}
-
-\begin{equation}
-
+\end{comment}
 \section{}
 \subsection{}
-
 \end{document}
