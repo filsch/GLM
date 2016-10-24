@@ -32,10 +32,15 @@ myglm = function(formula, data = list(), family, ...){
   return(est)
   }
   else if(family == "poisson"){
+    offset = model.offset(mf)
+    print(offset)
+    est = list(y = y, x = X, model = mf, offset = offset)
+
 
     est$call = match.call()
     est$formula = formula
     class(est) = 'myglm'
+    return(est)
   }
 }
 
