@@ -33,8 +33,37 @@ myglm = function(formula, data = list(), family, ...){
   }
   else if(family == "poisson"){
     offset = model.offset(mf)
-    print(offset)
-    est = list(y = y, x = X, model = mf, offset = offset)
+    loglik = function(offset, beta, X, y) {
+      return (sum(dpois(y, lambda = exp(offset + X%*%beta),  log=TRUE)))
+    }
+    beta = optim(par = numeric(dim(t(X))[1]), fn = loglik, method="BFGS", hessian = TRUE, control = list(fnscale=-1), X = X, offset = offset, y = y)
+    residual_df = dim(data)[1] - length(beta$par)
+
+    logsum <- function(y){
+      S <- 0
+      for(i in 1:y){
+        S <- S + log(i)
+      }
+      return(S)
+    }
+    logsumy <- c()
+    for(i in 1:length(y)){
+      logsumy <- c(logsumy, logsum(y[i]))
+    }
+
+    l_saturated = sum(y * log(y) - y - logsumy)
+    l_null = sum(y * log(mean(y)) - mean(y) - logsumy)
+    l_proposed
+    print("deviance")
+    print(2*(l_saturated - l_null))
+
+
+    #B = matrix(c(attr(X,"dimnames")[[2]], beta$par)[2,])
+    #print(X[1,])
+
+    est = list(terms = terms, y = y, x = X, model = mf, offset = offset,
+               coefficients = matrix(c(attr(X,"dimnames")[[2]], beta$par), ncol = length(beta$par),nrow = 2, byrow=TRUE),
+               beta_cov = solve(-beta$hessian), residual_df = residual_df)
 
 
     est$call = match.call()
