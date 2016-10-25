@@ -57,17 +57,18 @@ myglm = function(formula, data = list(), family, ...){
     for(i in 1:length(y)){
       logsumy <- c(logsumy, logsum(y[i]))
     }
-    lsaturated = sum(y * log(y) - y - logsumy)
-    lnull = sum(y * log(exp(offset + betanull$par)) - exp(offset + betanull$par) - logsumy)
-    null_deviance = 2*(lsaturated - lnull)
-    residual_df = length(dim(X)[1]) - length(beta$par)
+    ls = sum(y * log(y) - y - logsumy)
+    ln = sum(y * log(exp(offset + betanull$par)) - exp(offset + betanull$par) - logsumy)
+    lp = sum(y * log(exp(offset + X %*% beta$par)) - exp(offset + X %*% beta$par) - logsumy)
+    null_deviance = 2*(ls - ln)
+    res_deviance = 2*(ls-lp)
+    res_df = length(dim(X)[1]) - length(beta$par)
     print(null_deviance)
-    #lproposed = sum((X %*% beta$par)*log(exp(offset + (X %*% beta$par))) - (X %*% beta$par) - logsumy)
-    #print(2*(lsaturated - lproposed))
+    print(res_deviance)
 
     est = list(terms = terms, y = y, x = X, model = mf, offset = offset,
                coefficients = matrix(c(attr(X,"dimnames")[[2]], beta$par), ncol = length(beta$par),nrow = 2, byrow=TRUE),
-               beta_cov = solve(-beta$hessian), residual_df = residual_df, null_deviance = null_deviance)
+               beta_cov = solve(-beta$hessian), res_df = res_df, null_deviance = null_deviance, res_deviance = res_deviance)
 
 
     est$call = match.call()
