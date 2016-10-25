@@ -34,13 +34,18 @@ myglm = function(formula, data = list(), family, ...){
   else if(family == "poisson"){
     offset = model.offset(mf)
     loglik = function(offset, beta, X, y) {
+      if(is.null(X)){
+        return (sum(dpois(y, lambda = exp(offset + beta),  log=TRUE)))
+      }
+      else{
       return (sum(dpois(y, lambda = exp(offset + X%*%beta),  log=TRUE)))
+      }
     }
     loglik1 = function(offset, beta, X, y) {
-      return (sum(dpois(y, lambda = offset*exp(beta),  log=TRUE)))
+      return (sum(dpois(y, lambda = exp(offset + beta),  log=TRUE)))
     }
     beta = optim(par = numeric(dim(t(X))[1]), fn = loglik, method="BFGS", hessian = TRUE, control = list(fnscale=-1), X = X, offset = offset, y = y)
-    betanull = optim(par = numeric(1), fn = loglik1, method="BFGS", hessian = TRUE, control = list(fnscale=-1), X = NULL, offset = offset, y = y)
+    betanull = optim(par = numeric(1), fn = loglik, method="BFGS", hessian = TRUE, control = list(fnscale=-1), X = NULL, offset = offset, y = y)
     logsum <- function(y){
       S <- 0
       for(i in 1:y){
@@ -52,15 +57,17 @@ myglm = function(formula, data = list(), family, ...){
     for(i in 1:length(y)){
       logsumy <- c(logsumy, logsum(y[i]))
     }
-    lf = sum(y * log(y) - y - logsumy)
-    ln = sum(y * log(offset*exp(betanull$par)) - offset*exp(betanull$par) - logsumy)
-    print(2*(lf - ln))
-
-
+    lsaturated = sum(y * log(y) - y - logsumy)
+    lnull = sum(y * log(exp(offset + betanull$par)) - exp(offset + betanull$par) - logsumy)
+    null_deviance = 2*(lsaturated - lnull)
     residual_df = length(dim(X)[1]) - length(beta$par)
+    print(null_deviance)
+    #lproposed = sum((X %*% beta$par)*log(exp(offset + (X %*% beta$par))) - (X %*% beta$par) - logsumy)
+    #print(2*(lsaturated - lproposed))
+
     est = list(terms = terms, y = y, x = X, model = mf, offset = offset,
                coefficients = matrix(c(attr(X,"dimnames")[[2]], beta$par), ncol = length(beta$par),nrow = 2, byrow=TRUE),
-               beta_cov = solve(-beta$hessian), residual_df = residual_df)
+               beta_cov = solve(-beta$hessian), residual_df = residual_df, null_deviance = null_deviance)
 
 
     est$call = match.call()
