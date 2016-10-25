@@ -36,9 +36,11 @@ myglm = function(formula, data = list(), family, ...){
     loglik = function(offset, beta, X, y) {
       return (sum(dpois(y, lambda = exp(offset + X%*%beta),  log=TRUE)))
     }
+    loglik1 = function(offset, beta, X, y) {
+      return (sum(dpois(y, lambda = offset*exp(beta),  log=TRUE)))
+    }
     beta = optim(par = numeric(dim(t(X))[1]), fn = loglik, method="BFGS", hessian = TRUE, control = list(fnscale=-1), X = X, offset = offset, y = y)
-    residual_df = dim(data)[1] - length(beta$par)
-
+    betanull = optim(par = numeric(1), fn = loglik1, method="BFGS", hessian = TRUE, control = list(fnscale=-1), X = NULL, offset = offset, y = y)
     logsum <- function(y){
       S <- 0
       for(i in 1:y){
@@ -50,17 +52,12 @@ myglm = function(formula, data = list(), family, ...){
     for(i in 1:length(y)){
       logsumy <- c(logsumy, logsum(y[i]))
     }
-
-    l_saturated = sum(y * log(y) - y - logsumy)
-    l_null = sum(y * log(mean(y)) - mean(y) - logsumy)
-    l_proposed
-    print("deviance")
-    print(2*(l_saturated - l_null))
+    lf = sum(y * log(y) - y - logsumy)
+    ln = sum(y * log(offset*exp(betanull$par)) - offset*exp(betanull$par) - logsumy)
+    print(2*(lf - ln))
 
 
-    #B = matrix(c(attr(X,"dimnames")[[2]], beta$par)[2,])
-    #print(X[1,])
-
+    residual_df = length(dim(X)[1]) - length(beta$par)
     est = list(terms = terms, y = y, x = X, model = mf, offset = offset,
                coefficients = matrix(c(attr(X,"dimnames")[[2]], beta$par), ncol = length(beta$par),nrow = 2, byrow=TRUE),
                beta_cov = solve(-beta$hessian), residual_df = residual_df)
@@ -74,10 +71,10 @@ myglm = function(formula, data = list(), family, ...){
 }
 
 print.myglm = function(x, ...){
-  cat('Call: \n')
-  print(x$call)
-  cat('\nCoefficients: \n')
-  print(x$coefficients[,])
+  #cat('Call: \n')
+  #print(x$call)
+  #cat('\nCoefficients: \n')
+  #print(x$coefficients[,])
 }
 
 summary.myglm = function(object, ...){
