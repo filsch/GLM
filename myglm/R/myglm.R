@@ -63,12 +63,16 @@ myglm = function(formula, data = list(), family, ...){
     null_deviance = 2*(ls - ln)
     res_deviance = 2*(ls-lp)
     res_df = length(dim(X)[1]) - length(beta$par)
+    AIC = 2*length(beta$par) - 2*lp
+
+    print(AIC)
     print(null_deviance)
     print(res_deviance)
 
     est = list(terms = terms, y = y, x = X, model = mf, offset = offset,
                coefficients = matrix(c(attr(X,"dimnames")[[2]], beta$par), ncol = length(beta$par),nrow = 2, byrow=TRUE),
-               beta_cov = solve(-beta$hessian), res_df = res_df, null_deviance = null_deviance, res_deviance = res_deviance)
+               beta_cov = solve(-beta$hessian), res_df = res_df, null_deviance = null_deviance, res_deviance = res_deviance,
+               AIC = AIC)
 
 
     est$call = match.call()
