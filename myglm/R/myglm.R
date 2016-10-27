@@ -4,41 +4,40 @@ myglm = function(formula, data = list(), family, ...){
   X  = model.matrix(attr(mf, "terms"), data = mf)
   y  = model.response(mf)
   terms = attr(mf, "terms")
-
   if(family == "gaussian"){
-  if (attr(terms,"intercept") == 1){
-    rss_null <- t(y-mean(y))%*%(y-mean(y))
-    p = ncol(X) - 1
-  } else{
-    rss_null <- t(y)%*%y
-    p = ncol(X)
-  }
+    if (attr(terms,"intercept") == 1){
+      rss_null <- t(y-mean(y))%*%(y-mean(y))
+      p = ncol(X) - 1
+    } else{
+      rss_null <- t(y)%*%y
+      p = ncol(X)
+    }
 
-  beta_hat = solve(t(X)%*%X)%*%t(X)%*%y;      residuals = y - X%*%beta_hat;       rss_beta = t(y - X%*%beta_hat)%*%(y - X%*%beta_hat)
-  n = nrow(X);                                sigma2 = as.numeric(rss_beta/n);
-  beta_hat_cov = solve((t(X)%*%X)) * sigma2;  fitted = as.vector(X %*% beta_hat)
-  R_squared = 1 - rss_beta/rss_null;          adj_R_squared = R_squared - (1 - R_squared) * (p)/(n - p)
+    beta_hat = solve(t(X)%*%X)%*%t(X)%*%y;      residuals = y - X%*%beta_hat;       rss_beta = t(y - X%*%beta_hat)%*%(y - X%*%beta_hat)
+    n = nrow(X);                                sigma2 = as.numeric(rss_beta/n);
+    beta_hat_cov = solve((t(X)%*%X)) * sigma2;  fitted = as.vector(X %*% beta_hat)
+    R_squared = 1 - rss_beta/rss_null;          adj_R_squared = R_squared - (1 - R_squared) * (p)/(n - p)
 
-  est = list(terms = terms, model = mf, coefficients = beta_hat, beta_cov = beta_hat_cov,
-             residuals = residuals, n=n, p = p, sigma2=sigma2,
-             rss_beta = rss_beta, rss_null = rss_null, fitted = fitted, y = y,
-             R_squared = R_squared, adj_R_squared = adj_R_squared, x = X)
-  # Store call and formula used
-  est$call = match.call()
-  est$formula = formula
-  # Set class name. This is very important!
-  class(est) = 'myglm'
-  # Return the object with all results
-  return(est)
+    est = list(terms = terms, model = mf, coefficients = beta_hat, beta_cov = beta_hat_cov,
+               residuals = residuals, n=n, p = p, sigma2=sigma2,
+               rss_beta = rss_beta, rss_null = rss_null, fitted = fitted, y = y,
+               R_squared = R_squared, adj_R_squared = adj_R_squared, x = X)
+    # Store call and formula used
+    est$call = match.call()
+    est$formula = formula
+    # Set class name. This is very important!
+    class(est) = 'myglm'
+    # Return the object with all results
+    return(est)
   }
   else if(family == "poisson"){
     offset = model.offset(mf)
+    if(is.null(offset) == 1){
+      offset = 0
+    }
     loglik = function(offset, beta, X, y) {
       if(is.null(X) == 1){
         return (sum(dpois(y, lambda = exp(offset + beta),  log=TRUE)))
-      }else if(is.null(offset) == 1){
-        print("test")
-        return(sum(dpois(y,lambda = exp(X%*%beta), log = TRUE)))
       }else{
         return (sum(dpois(y, lambda = exp(offset + X%*%beta),  log=TRUE)))
       }
@@ -56,9 +55,11 @@ myglm = function(formula, data = list(), family, ...){
     for(i in 1:length(y)){
       logsumy <- c(logsumy, logsum(y[i]))
     }
+
     ls = sum(y * log(y) - y - logsumy)
     ln = sum(y * log(exp(offset + betanull$par)) - exp(offset + betanull$par) - logsumy)
     lp = sum(y * log(exp(offset + X %*% beta$par)) - exp(offset + X %*% beta$par) - logsumy)
+
     null_deviance = 2*(ls - ln)
     res_deviance = 2*(ls-lp)
     res_df = dim(X)[1] - length(beta$par)
