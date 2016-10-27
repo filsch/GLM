@@ -33,8 +33,46 @@ myglm = function(formula, data = list(), family, ...){
   }
   else if(family == "poisson"){
     offset = model.offset(mf)
-    print(offset)
-    est = list(y = y, x = X, model = mf, offset = offset)
+    loglik = function(offset, beta, X, y) {
+      if(is.null(X) == 1){
+        return (sum(dpois(y, lambda = exp(offset + beta),  log=TRUE)))
+      }else if(is.null(offset) == 1){
+        print("test")
+        return(sum(dpois(y,lambda = exp(X%*%beta), log = TRUE)))
+      }else{
+        return (sum(dpois(y, lambda = exp(offset + X%*%beta),  log=TRUE)))
+      }
+    }
+    beta = optim(par = numeric(dim(t(X))[1]), fn = loglik, method="BFGS", hessian = TRUE, control = list(fnscale=-1), X = X, offset = offset, y = y)
+    betanull = optim(par = numeric(1), fn = loglik, method="BFGS", hessian = TRUE, control = list(fnscale=-1), X = NULL, offset = offset, y = y)
+    logsum <- function(y){
+      S <- 0
+      for(i in 1:y){
+        S <- S + log(i)
+      }
+      return(S)
+    }
+    logsumy <- c()
+    for(i in 1:length(y)){
+      logsumy <- c(logsumy, logsum(y[i]))
+    }
+    ls = sum(y * log(y) - y - logsumy)
+    ln = sum(y * log(exp(offset + betanull$par)) - exp(offset + betanull$par) - logsumy)
+    lp = sum(y * log(exp(offset + X %*% beta$par)) - exp(offset + X %*% beta$par) - logsumy)
+    null_deviance = 2*(ls - ln)
+    res_deviance = 2*(ls-lp)
+    res_df = dim(X)[1] - length(beta$par)
+    AIC = 2*length(beta$par) - 2*lp
+
+    print(AIC)
+    print(null_deviance)
+    print(res_deviance)
+    print(res_df)
+
+    est = list(terms = terms, y = y, x = X, model = mf, offset = offset,
+               coefficients = matrix(c(attr(X,"dimnames")[[2]], beta$par), ncol = length(beta$par),nrow = 2, byrow=TRUE),
+               beta_cov = solve(-beta$hessian), res_df = res_df, null_deviance = null_deviance, res_deviance = res_deviance,
+               AIC = AIC)
 
 
     est$call = match.call()
@@ -45,10 +83,10 @@ myglm = function(formula, data = list(), family, ...){
 }
 
 print.myglm = function(x, ...){
-  cat('Call: \n')
-  print(x$call)
-  cat('\nCoefficients: \n')
-  print(x$coefficients[,])
+  #cat('Call: \n')
+  #print(x$call)
+  #cat('\nCoefficients: \n')
+  #print(x$coefficients[,])
 }
 
 summary.myglm = function(object, ...){
