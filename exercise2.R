@@ -3,6 +3,45 @@ d = read.table(data.file,
                col.names = c("home", "away", "x", "y"),
                colClasses = c("character", "character", "numeric","numeric"))
 
+#testing independence
+names = c('0','1','2','3','4+')
+data = matrix(data <- numeric(25), nrow = 5,ncol = 5, dimnames = list(names,names))
+
+for(i in 1:(dim(d)[1])){
+  if(d[i,3] < 4 & d[i,4] < 4){
+    data[d[i,4]+1, d[i,3]+1] = data[d[i,4]+1, d[i,3]+1] + 1
+  }else if(d[i,3] < 4 & d[i,4] >= 4){
+    data[5, d[i,3]+1] = data[5, d[i,3]+1] + 1
+  }else if(d[i,3] >= 4 & d[i,4] < 4){
+    data[d[i,4]+1, 5] = data[d[i,4]+1, 5] + 1
+  }else{
+    data[5,5] = data[5,5] + 1
+  }
+}
+print(data)
+O <- data
+O = matrix(O, nrow = 5)
+O = t(O)
+print(O)
+E = numeric(25)
+print(E)
+E = matrix(E, nrow = 5)
+for(i in 1:5){
+  for(j in 1:5){
+    E[i,j] = sum(O[i,])*sum(O[,j])/sum(O)
+  }
+}
+print(O)
+print(E)
+X = 0
+for(i in 1:5){
+  for(j in 1:5){
+    X = X + (O[i,j] - E[i,j])^2/E[i,j]
+  }
+}
+print(X)
+
+#creating full ranking
 teamnames <- c()
 points <- numeric(20)
 for(i in 1:(dim(d)[1])){
@@ -24,3 +63,6 @@ for(i in 1:(dim(d)[1])){
 }
 names(points) <- teamnames
 sort(points,decreasing = TRUE)
+
+#testing independence
+matrix(data = numeric(16), nrow = 4,ncol = 4)
