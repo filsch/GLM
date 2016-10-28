@@ -1,3 +1,6 @@
+data = read.table("https://www.math.ntnu.no/emner/TMA4315/2016h/Assignment2/smoking.txt",
+               header=TRUE)
+
 myglm = function(formula, data = list(), family, ...){
   # Extract model matrix & responses
   mf = model.frame(formula = formula, data = data)
@@ -22,7 +25,8 @@ myglm = function(formula, data = list(), family, ...){
   est = list(terms = terms, model = mf, coefficients = beta_hat, beta_cov = beta_hat_cov,
              residuals = residuals, n=n, p = p, sigma2=sigma2,
              rss_beta = rss_beta, rss_null = rss_null, fitted = fitted, y = y,
-             R_squared = R_squared, adj_R_squared = adj_R_squared, x = X)
+             R_squared = R_squared, adj_R_squared = adj_R_squared, x = X,
+             family = "gaussian")
   # Store call and formula used
   est$call = match.call()
   est$formula = formula
@@ -33,47 +37,35 @@ myglm = function(formula, data = list(), family, ...){
   }
   else if(family == "poisson"){
     offset = model.offset(mf)
+    if (is.null(offset) == 1){
+      offset = 0
+    }
     loglik = function(offset, beta, X, y) {
       if(is.null(X) == 1){
         return (sum(dpois(y, lambda = exp(offset + beta),  log=TRUE)))
-      }else if(is.null(offset) == 1){
-        print("test")
-        return(sum(dpois(y,lambda = exp(X%*%beta), log = TRUE)))
       }else{
         return (sum(dpois(y, lambda = exp(offset + X%*%beta),  log=TRUE)))
       }
     }
-    beta = optim(par = numeric(dim(t(X))[1]), fn = loglik, method="BFGS", hessian = TRUE, control = list(fnscale=-1), X = X, offset = offset, y = y)
+    beta = optim(par = numeric(dim(X)[2]), fn = loglik, method="BFGS", hessian = TRUE, control = list(fnscale=-1), X = X, offset = offset, y = y)
     betanull = optim(par = numeric(1), fn = loglik, method="BFGS", hessian = TRUE, control = list(fnscale=-1), X = NULL, offset = offset, y = y)
-    logsum <- function(y){
-      S <- 0
-      for(i in 1:y){
-        S <- S + log(i)
-      }
-      return(S)
-    }
-    logsumy <- c()
-    for(i in 1:length(y)){
-      logsumy <- c(logsumy, logsum(y[i]))
-    }
-    ls = sum(y * log(y) - y - logsumy)
-    ln = sum(y * log(exp(offset + betanull$par)) - exp(offset + betanull$par) - logsumy)
-    lp = sum(y * log(exp(offset + X %*% beta$par)) - exp(offset + X %*% beta$par) - logsumy)
-    null_deviance = 2*(ls - ln)
-    res_deviance = 2*(ls-lp)
+
+    ls = (y * log(y) - y)
+    ln = (y * (offset + betanull$par) - exp(offset + betanull$par))
+    lp = (y * (offset + X %*% beta$par) - exp(offset + X %*% beta$par))
+
+    null_deviance = 2*sum(ls - ln);   res_deviance = 2*sum(ls - lp)
     res_df = dim(X)[1] - length(beta$par)
-    AIC = 2*length(beta$par) - 2*lp
+    AIC = 2*length(beta$par) - 2*sum(lp - lfactorial(y))
+    dev_residuals = 2
 
-    print(AIC)
-    print(null_deviance)
-    print(res_deviance)
-    print(res_df)
+    #sqrt(y*log(y/exp(offset + X %*% beta$par)) - y + exp(offset + X %*% beta$par))
 
-    est = list(terms = terms, y = y, x = X, model = mf, offset = offset,
-               coefficients = matrix(c(attr(X,"dimnames")[[2]], beta$par), ncol = length(beta$par),nrow = 2, byrow=TRUE),
-               beta_cov = solve(-beta$hessian), res_df = res_df, null_deviance = null_deviance, res_deviance = res_deviance,
-               AIC = AIC)
-
+      est = list(terms = terms, y = y, x = X, model = mf, offset = offset,
+               coefficients = beta$par, beta_cov = solve(-beta$hessian),
+               res_df = res_df, null_deviance = null_deviance,
+               res_deviance = res_deviance, AIC = AIC, family=family,
+               dev_residuals = dev_residuals)
 
     est$call = match.call()
     est$formula = formula
@@ -82,14 +74,24 @@ myglm = function(formula, data = list(), family, ...){
   }
 }
 
-print.myglm = function(x, ...){
-  #cat('Call: \n')
-  #print(x$call)
-  #cat('\nCoefficients: \n')
-  #print(x$coefficients[,])
+print.myglm = function(object, ...){
+  cat('Call: \n')
+  print(object$call)
+  cat('\nCoefficients: \n')
+  if (object$family == "poisson"){
+    frame = data.frame(t(x$coefficients), row.names=''); colnames(frame) <- attr(object$x,"dimnames")[[2]]
+    print(frame, right = FALSE, digits = 4)
+    cat('\n')
+    cat('Degrees of Freedom: ', dim(object$x)[1] - 1, ' Total (i.e. Null);  ', object$res_df, 'Residual \n')
+    cat('Null deviance: ', object$null_deviance, '\n')
+    cat('Residual deviance: ', object$res_deviance, '\t AIC: ', object$AIC)
+    } else if (object$family == "gaussian") {
+    cat(x$coefficients[,])
+  }
 }
 
 summary.myglm = function(object, ...){
+  if (object$family == "gaussian"){
   coeff = object$coefficients; resid = object$residuals; p = object$p; n = object$n
   std_error = z_value = z_score = numeric(length(coeff))
   for (i in 1:length(coeff)){
@@ -109,22 +111,52 @@ summary.myglm = function(object, ...){
   frame = data.frame(min(resid), quantile(resid, 0.25), median(resid),
                      quantile(resid, 0.75), max(resid), row.names = '')
   colnames(frame) <- c('Min','1stQ','Median','3rdQ','Max')
-  print(frame)
+  print(frame,digits = 3)
   cat("\n Coefficients: \n")
-  frame = data.frame(round(coeff,3), round(std_error,3), round(z_value,3), z_score)
+  frame = data.frame(coeff, std_error, z_value, z_score)
   colnames(frame) <- c('Estimate','Std. Error','Z-value','Z-score')
   print(frame)
   cat('--- \n')
   cat("Residual standard error: ", sqrt(object$sigma2), " on ", n-p, " degrees of freedom \n")
   cat("Multiple R-squared: ", round(object$R_squared,5), "\t Adjusted R-squared:  ", round(object$adj_R_squared,5), "\n")
   cat("'Chi2'-statistic: ", round(chi_stat,3), " on ", p, "DF,  p-value: ", chi_p_value)
+
+  }
+  else if (object$family == "poisson") {
+
+    coefficients = as.array(object$coefficients); dev_residuals = object$dev_residuals
+    std_error = z_value = z_score = numeric(length(coefficients))
+    for (i in 1:length(coefficients)){
+      z_value[i]   = coefficients[i] / sqrt(object$beta_cov[i,i])
+      std_error[i] = sqrt(object$beta_cov[i,i])
+    }
+    z_score   = 1 - pnorm(abs(z_value), mean = 0, sd = 1); z_score[z_score == 0] = '< 2e-16'
+    row.names(coefficients) = attr(object$x,"dimnames")[[2]]
+
+    cat("Call: \n")
+    print(object$call)
+    cat('\n Deviance Residuals: \n')
+    frame = data.frame(min(dev_residuals), quantile(dev_residuals, 0.25), median(dev_residuals),
+                       quantile(dev_residuals, 0.75), max(dev_residuals), row.names = '')
+    colnames(frame) <- c('Min','1stQ','Median','3rdQ','Max')
+    print(frame, digits = 5)
+    cat("\n Coefficients: \n")
+    frame = data.frame(coefficients, std_error, z_value, z_score)
+    colnames(frame) <- c('Estimate','Std. Error','Z-value','Z-score')
+    print(frame, digits=5)
+    cat('--- \n')
+    cat("Null deviance: ", object$null_deviance, " on ", dim(object$x)[1]-1, " degrees of freedom \n")
+    cat("Residual deviance: ", object$res_deviance, " on ", object$res_dof, " degrees of freedom \n")
+    cat("AIC: ", object$AIC)
+  }
 }
 
-plot.myglm = function(x, ...){
-  plot(x$fitted, x$y, xlab='Fitted', ylab='Observed', main='Observed vs fitted values')
+plot.myglm = function(object, ...){
+  plot(object$fitted, object$y, xlab='Fitted', ylab='Observed', main='Observed vs fitted values')
 }
 
 anova.myglm = function(object, ...){
+  if (object$family == "gaussian"){
   comp = attr(object$terms, "term.labels")
   dof = Sum_Sq = numeric(length(comp)+1)
   # Name of response
@@ -191,6 +223,12 @@ anova.myglm = function(object, ...){
   cat('Analysis of Variance Table\n')
   cat(c('Response: ', response, '\n'), sep='')
   print(frame)
-  cat('--- \n')
-  #return(model)
+  cat('--- \n')}
+  else if (object$family == "poisson"){
+    cat('Analysis of Deviance Table \n \n')
+    cat('Model: ', object$family, ' link: ', 3, '\n \n')#link)
+    cat('Response: ', response, '\n \n')
+    cat('Terms added sequentially (first to last) \n \n \n')
+    print(frame)
+  }
 }
