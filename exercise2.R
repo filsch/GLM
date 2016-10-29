@@ -42,27 +42,66 @@ for(i in 1:5){
 print(X)
 
 #creating full ranking
-teamnames <- c()
-points <- numeric(20)
-for(i in 1:(dim(d)[1])){
-  if(is.element(d[i,1],teamnames) == FALSE){
-    teamnames <- c(teamnames, d[i,1])
+createTable <- function(){
+  data.file = "https://www.math.ntnu.no/emner/TMA4315/2016h/Assignment2/PremierLeague2015.txt"
+  d = read.table(data.file,
+                 col.names = c("home", "away", "x", "y"),
+                 colClasses = c("character", "character", "numeric","numeric"))
+  teamnames <- c()
+  points <- numeric(20)
+  for(i in 1:(dim(d)[1])){
+    if(is.element(d[i,1],teamnames) == FALSE){
+      teamnames <- c(teamnames, d[i,1])
+    }
   }
+  for(i in 1:(dim(d)[1])){
+    if(d[i,3] == d[i,4]){
+      points[grep(d[i,1],teamnames)] = points[grep(d[i,1],teamnames)] + 1
+      points[grep(d[i,2],teamnames)] = points[grep(d[i,2],teamnames)] + 1
+    }
+    else if(d[i,3] > d[i,4]){
+      points[grep(d[i,1],teamnames)] = points[grep(d[i,1],teamnames)] + 3
+    }
+    else if(d[i,3] < d[i,4]){
+      points[grep(d[i,2],teamnames)] = points[grep(d[i,2],teamnames)] + 3
+    }
+  }
+  names(points) <- teamnames
+  points = sort(points,decreasing = TRUE)
+  return(points)
 }
-for(i in 1:(dim(d)[1])){
-  if(d[i,3] == d[i,4]){
-    points[grep(d[i,1],teamnames)] = points[grep(d[i,1],teamnames)] + 1
-    points[grep(d[i,1],teamnames)] = points[grep(d[i,1],teamnames)] + 1
-  }
-  else if(d[i,3] > d[i,4]){
-    points[grep(d[i,1],teamnames)] = points[grep(d[i,1],teamnames)] + 3
-  }
-  else if(d[i,3] < d[i,4]){
-    points[grep(d[i,2],teamnames)] = points[grep(d[i,2],teamnames)] + 3
-  }
-}
-names(points) <- teamnames
-sort(points,decreasing = TRUE)
 
-#testing independence
-matrix(data = numeric(16), nrow = 4,ncol = 4)
+#creating X-matrix
+
+createY <- function(){
+  data.file = "https://www.math.ntnu.no/emner/TMA4315/2016h/Assignment2/PremierLeague2015.txt"
+  d = read.table(data.file,
+                 col.names = c("home", "away", "x", "y"),
+                 colClasses = c("character", "character", "numeric","numeric"))
+  for(i in 1:dim(d)[1]){
+    y <- c(y, d[i,3], d[i,4])
+  }
+  return(y)
+}
+
+createX <- function(){
+  teamnames <- c()
+  for(i in 1:(dim(d)[1])){
+    if(is.element(d[i,1],teamnames) == FALSE){
+      teamnames <- c(teamnames, d[i,1])
+    }
+  }
+  colnames <- c("HomeAdvantage", teamnames)
+  X <- numeric(2*dim(d)[1]*(length(teamnames) + 1))
+  X <- matrix(X, nrow = 2*dim(d)[1], ncol = length(teamnames) + 1)
+  colnames(X) <- colnames
+  for(i in 1:(dim(X)[1])){
+    if(i %% 2 == 1){
+      X[i,1] = 1
+      X[i+1,1] = 0
+      X[i,grep(d[i,1],colnames)] = 1
+      X[i+1,grep(d[i,2],colnames)] = 1
+    }
+  }
+  return(X)
+}
