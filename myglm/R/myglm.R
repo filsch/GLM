@@ -41,15 +41,14 @@ myglm = function(formula, data = list(), family, ...){
       offset = 0
     }
     loglik = function(offset, beta, X, y) {
-      if(is.null(X) == 1){
-        return (sum(dpois(y, lambda = exp(offset + beta),  log=TRUE)))
-      }else{
         return (sum(dpois(y, lambda = exp(offset + X%*%beta),  log=TRUE)))
-      }
     }
     beta = optim(par = numeric(dim(X)[2]), fn = loglik, method="BFGS", hessian = TRUE, control = list(fnscale=-1), X = X, offset = offset, y = y)
-    betanull = optim(par = numeric(1), fn = loglik, method="BFGS", hessian = TRUE, control = list(fnscale=-1), X = NULL, offset = offset, y = y)
-
+    if (attr(terms,"intercept") == 1){
+    betanull = optim(par = numeric(1), fn = loglik, method="BFGS", hessian = TRUE, control = list(fnscale=-1), X = 1, offset = offset, y = y)
+    } else {
+      betanull = list(par=0)
+    }
     ls = (y * log(y) - y)
     ln = (y * (offset + betanull$par) - exp(offset + betanull$par))
     lp = (y * (offset + X %*% beta$par) - exp(offset + X %*% beta$par))
@@ -57,15 +56,21 @@ myglm = function(formula, data = list(), family, ...){
     null_deviance = 2*sum(ls - ln);   res_deviance = 2*sum(ls - lp)
     res_df = dim(X)[1] - length(beta$par)
     AIC = 2*length(beta$par) - 2*sum(lp - lfactorial(y))
-    dev_residuals = 2
+    dev_residuals = sign(y - exp(offset + X %*% beta$par)) * sqrt(2*(ls - lp))
 
-    #sqrt(y*log(y/exp(offset + X %*% beta$par)) - y + exp(offset + X %*% beta$par))
-
-      est = list(terms = terms, y = y, x = X, model = mf, offset = offset,
+    if (attr(terms,"intercept") == 1){
+      null_df = dim(X)[1] - 1
+    } else {
+      null_df = dim(X)[1]
+    }
+    yhat = offset + X%*%beta$par
+    yres = y - exp(yhat)
+      est = list(terms = terms, mf=mf, y = y, x = X, model = mf, offset = offset,
                coefficients = beta$par, beta_cov = solve(-beta$hessian),
                res_df = res_df, null_deviance = null_deviance,
                res_deviance = res_deviance, AIC = AIC, family=family,
-               dev_residuals = dev_residuals)
+               dev_residuals = dev_residuals, null_df = null_df, data = data,
+               yhat = yhat, yres = yres)
 
     est$call = match.call()
     est$formula = formula
@@ -79,10 +84,10 @@ print.myglm = function(object, ...){
   print(object$call)
   cat('\nCoefficients: \n')
   if (object$family == "poisson"){
-    frame = data.frame(t(x$coefficients), row.names=''); colnames(frame) <- attr(object$x,"dimnames")[[2]]
+    frame = data.frame(t(object$coefficients), row.names=''); colnames(frame) <- attr(object$x,"dimnames")[[2]]
     print(frame, right = FALSE, digits = 4)
     cat('\n')
-    cat('Degrees of Freedom: ', dim(object$x)[1] - 1, ' Total (i.e. Null);  ', object$res_df, 'Residual \n')
+    cat('Degrees of Freedom: ', object$null_df, ' Total (i.e. Null);  ', object$res_df, 'Residual \n')
     cat('Null deviance: ', object$null_deviance, '\n')
     cat('Residual deviance: ', object$res_deviance, '\t AIC: ', object$AIC)
     } else if (object$family == "gaussian") {
@@ -126,10 +131,10 @@ summary.myglm = function(object, ...){
 
     coefficients = as.array(object$coefficients); dev_residuals = object$dev_residuals
     std_error = z_value = z_score = numeric(length(coefficients))
-    for (i in 1:length(coefficients)){
-      z_value[i]   = coefficients[i] / sqrt(object$beta_cov[i,i])
-      std_error[i] = sqrt(object$beta_cov[i,i])
-    }
+
+    std_error = sqrt(diag(object$beta_cov))
+    z_value   = coefficients / std_error
+
     z_score   = 1 - pnorm(abs(z_value), mean = 0, sd = 1); z_score[z_score == 0] = '< 2e-16'
     row.names(coefficients) = attr(object$x,"dimnames")[[2]]
 
@@ -145,14 +150,19 @@ summary.myglm = function(object, ...){
     colnames(frame) <- c('Estimate','Std. Error','Z-value','Z-score')
     print(frame, digits=5)
     cat('--- \n')
-    cat("Null deviance: ", object$null_deviance, " on ", dim(object$x)[1]-1, " degrees of freedom \n")
-    cat("Residual deviance: ", object$res_deviance, " on ", object$res_dof, " degrees of freedom \n")
+    cat("Null deviance: ", object$null_deviance, " on ", object$null_df, " degrees of freedom \n")
+    cat("Residual deviance: ", object$res_deviance, " on ", object$res_df, " degrees of freedom \n")
     cat("AIC: ", object$AIC)
   }
 }
 
 plot.myglm = function(object, ...){
-  plot(object$fitted, object$y, xlab='Fitted', ylab='Observed', main='Observed vs fitted values')
+  if (object$family == "gaussian"){
+    plot(object$fitted, object$y, xlab='Fitted', ylab='Observed', main='Observed vs fitted values')
+  } else if (object$family == "poisson"){
+    colors <- 1:(max(object$y)+1)
+    plot(x=object$yhat, y=object$yres, col=colors[object$y+1], main="Residuals v. Fitted")
+  }
 }
 
 anova.myglm = function(object, ...){
@@ -173,7 +183,7 @@ anova.myglm = function(object, ...){
       txtFormula = paste(txtFormula, comp[numComp], sep = "+")
     }
     formula = formula(txtFormula)
-    model[[numComp]] = myglm(formula=formula, data = object$model)
+    model[[numComp]] = myglm(formula=formula, data = object$model,family="gaussian")
 
     intercept_bool <- attr(object$terms, "intercept")
     num_levels <- length(levels(model[[numComp]]$model[[comp[numComp]]]))
@@ -225,10 +235,85 @@ anova.myglm = function(object, ...){
   print(frame)
   cat('--- \n')}
   else if (object$family == "poisson"){
+    comp = attr(object$terms, "term.labels")
+    dof_resid = dev_resid = numeric(length(comp)+1)
+    dev = dof = numeric(length(comp))
+
+    # Name of response
+    response = deparse(object$terms[[2]])
+    # Fit the sequence of models
+    txtFormula = paste(response, "~", sep = "")
+    model = list()
+    extra <- 0
+    offset <- attr(object$terms,"offset")
+
+    if (!is.null(offset)){
+      txtFormula = paste(txtFormula, rownames(attr(object$terms,"factors"))[offset])
+    }
+    for(numComp in 1:length(comp)){
+      if(numComp == 1){
+        if(!is.null(offset)){
+          txtFormula = paste(txtFormula, comp[numComp], sep = "+")
+        } else {
+          txtFormula = paste(txtFormula, comp[numComp])
+        }
+      }
+      else{
+        txtFormula = paste(txtFormula, comp[numComp], sep = "+")
+      }
+      formula = formula(txtFormula)
+
+      model[[numComp]] = myglm(formula=formula, data = object$data, family="poisson")
+
+      intercept_bool <- attr(object$terms, "intercept")
+      num_levels <- length(levels(model[[numComp]]$model[[comp[numComp]]]))
+
+      if (num_levels == 0){
+        dof[numComp] = 1
+      } else {
+        dof[numComp] = num_levels - 1
+        if (extra == 0 && intercept_bool == 0){
+          extra = numComp
+        }
+
+      }
+      dev_resid[1] = object$null_deviance
+      dev_resid[numComp + 1] = model[[numComp]]$res_deviance
+
+      factors_combi <- attr(model[[numComp]]$terms,"factors")[,numComp]
+      if(sum(factors_combi) > 1){
+        factors_combi_bool = as.logical(attr(model[[numComp]]$terms,"factors")[-1,numComp])
+        if (!is.null(offset)){
+          factors_combi_bool = factors_combi_bool[2:length(factors_combi_bool)]
+        }
+        multi_dof <- 1
+        print(factors_combi_bool)
+        for (i in 1:length(factors_combi_bool)){
+          if (factors_combi_bool[i] != 0){
+            multi_dof = multi_dof * dof[i]
+          }
+        }
+        dof[numComp] = multi_dof
+      }
+    }
+
+    if (attr(object$terms, "intercept") == 0){
+      dof[extra] = dof[extra] + 1
+    }
+    dof_resid[1] = object$null_df
+    for (i in 1:length(dof)){
+      dev[i] = dev_resid[i] - dev_resid[i+1]
+      dof_resid[1 + i] = dof_resid[i] - dof[i]
+    }
+
+    frame = data.frame(c('', dof), c('', round(dev)), dof_resid, dev_resid)
+    colnames(frame) <- c('Df', 'Deviance', 'Resid. Df', 'Resid. Dev')
+    rownames(frame) <- c('NULL', comp)
+
     cat('Analysis of Deviance Table \n \n')
-    cat('Model: ', object$family, ' link: ', 3, '\n \n')#link)
-    cat('Response: ', response, '\n \n')
+    cat('Model: ', object$family, ' link: log \n \n')#link)
+    cat('Response: ', rownames(attr(object$terms,"factors"))[1], '\n \n')
     cat('Terms added sequentially (first to last) \n \n \n')
-    print(frame)
+    print(frame, digits = 1)
   }
 }
