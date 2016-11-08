@@ -7,15 +7,14 @@ myglm = function(formula, data = list(), family, ...){
   X  = model.matrix(attr(mf, "terms"), data = mf)
   y  = model.response(mf)
   terms = attr(mf, "terms")
-
   if(family == "gaussian"){
-  if (attr(terms,"intercept") == 1){
-    rss_null <- t(y-mean(y))%*%(y-mean(y))
-    p = ncol(X) - 1
-  } else{
-    rss_null <- t(y)%*%y
-    p = ncol(X)
-  }
+    if (attr(terms,"intercept") == 1){
+      rss_null <- t(y-mean(y))%*%(y-mean(y))
+      p = ncol(X) - 1
+    } else{
+      rss_null <- t(y)%*%y
+      p = ncol(X)
+    }
 
   beta_hat = solve(t(X)%*%X)%*%t(X)%*%y;      residuals = y - X%*%beta_hat;       rss_beta = t(y - X%*%beta_hat)%*%(y - X%*%beta_hat)
   n = nrow(X);                                sigma2 = as.numeric(rss_beta/n);
