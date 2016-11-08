@@ -1,5 +1,4 @@
-data = read.table("https://www.math.ntnu.no/emner/TMA4315/2016h/Assignment2/smoking.txt",
-               header=TRUE)
+data = read.table("https://www.math.ntnu.no/emner/TMA4315/2016h/Assignment3/wikimountains.txt",header=TRUE)
 
 myglm = function(formula, data = list(), family, ...){
   # Extract model matrix & responses
@@ -76,6 +75,36 @@ myglm = function(formula, data = list(), family, ...){
     class(est) = 'myglm'
     return(est)
   }
+  else if(family == "binomial"){
+    loglik = function(beta, X, n, y){
+      return (sum(t(y) %*% X %*% beta - t(n)%*%log(1 + exp(X%*%beta)) ))
+    }
+    #What is n in the model number of grouped data
+    n = matrix(rowSums(y))
+    if (dim(y)[2] != 1){
+      y = matrix(y[,1]/rowSums(y))
+    }
+    beta = optim(par = numeric(dim(X)[2]), fn = loglik, method="BFGS", hessian = TRUE,
+                 control = list(fnscale=-1), X = X, n = n, y = y)
+    betanull = optim(par=numeric(1), fn = loglik, method="BFGS", hessian = TRUE,
+                     control = list(fnscale=-1), X = matrix(numeric(length(y)) + 1), n = n, y = y)
+
+    ls = t(y*log(y) + (n - y)*log(n - y) - n*log(n))
+    ln = t(y*betanull$par - n*log(1 + exp(betanull$par)))
+    lp = t(y) %*% X %*% beta$par - -t(n) %*% log(1 + exp(X %*% beta$par))
+    dev_residuals =
+    res_df =
+    null_deviance =
+    AIC =
+
+    est = list(terms = terms, mf=mf, y = y, x = X, model = mf,
+               coefficients = beta$par, beta_cov = solve(-beta$hessian),
+               res_df = res_df, null_deviance = null_deviance,
+               res_deviance = res_deviance, AIC = AIC, family=family,
+               dev_residuals = dev_residuals, null_df = null_df, data = data,
+               yhat = yhat, yres = yres)
+
+  }
 }
 
 print.myglm = function(object, ...){
@@ -89,7 +118,8 @@ print.myglm = function(object, ...){
     cat('Degrees of Freedom: ', object$null_df, ' Total (i.e. Null);  ', object$res_df, 'Residual \n')
     cat('Null deviance: ', object$null_deviance, '\n')
     cat('Residual deviance: ', object$res_deviance, '\t AIC: ', object$AIC)
-    } else if (object$family == "gaussian") {
+    }
+  else if (object$family == "gaussian") {
     cat(x$coefficients[,])
   }
 }
@@ -158,7 +188,8 @@ summary.myglm = function(object, ...){
 plot.myglm = function(object, ...){
   if (object$family == "gaussian"){
     plot(object$fitted, object$y, xlab='Fitted', ylab='Observed', main='Observed vs fitted values')
-  } else if (object$family == "poisson"){
+  }
+  else if (object$family == "poisson"){
     colors <- 1:(max(object$y)+1)
     plot(x=object$yhat, y=object$yres, col=colors[object$y+1], main="Residuals v. Fitted")
   }
