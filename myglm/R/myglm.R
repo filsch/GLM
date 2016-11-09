@@ -25,13 +25,6 @@ myglm = function(formula, data = list(), family, ...){
              rss_beta = rss_beta, rss_null = rss_null, fitted = fitted, y = y,
              R_squared = R_squared, adj_R_squared = adj_R_squared, x = X,
              family = "gaussian")
-  # Store call and formula used
-  est$call = match.call()
-  est$formula = formula
-  # Set class name. This is very important!
-  class(est) = 'myglm'
-  # Return the object with all results
-  return(est)
   }
   else if(family == "poisson"){
     offset = model.offset(mf)
@@ -69,42 +62,51 @@ myglm = function(formula, data = list(), family, ...){
                res_deviance = res_deviance, AIC = AIC, family=family,
                dev_residuals = dev_residuals, null_df = null_df, data = data,
                yhat = yhat, yres = yres)
-
-    est$call = match.call()
-    est$formula = formula
-    class(est) = 'myglm'
-    return(est)
   }
   else if(family == "binomial"){
     loglik = function(beta, X, n, y){
-      return (sum(t(y) %*% X %*% beta - t(n)%*%log(1 + exp(X%*%beta)) ))
+      return (sum(y * X %*% beta - n*log(1 + exp(X%*%beta)) ))
     }
     #What is n in the model number of grouped data
     n = matrix(rowSums(y))
     if (dim(y)[2] != 1){
-      y = matrix(y[,1]/rowSums(y))
+      ratios = matrix(y[,1]/rowSums(y))
     }
+    y = matrix(y[,1])
     beta = optim(par = numeric(dim(X)[2]), fn = loglik, method="BFGS", hessian = TRUE,
                  control = list(fnscale=-1), X = X, n = n, y = y)
     betanull = optim(par=numeric(1), fn = loglik, method="BFGS", hessian = TRUE,
                      control = list(fnscale=-1), X = matrix(numeric(length(y)) + 1), n = n, y = y)
 
-    ls = t(y*log(y) + (n - y)*log(n - y) - n*log(n))
-    ln = t(y*betanull$par - n*log(1 + exp(betanull$par)))
-    lp = t(y) %*% X %*% beta$par - -t(n) %*% log(1 + exp(X %*% beta$par))
-    dev_residuals =
-    res_df =
-    null_deviance =
-    AIC =
+    ls = y*log(y) + (n - y)*log(n - y) - n*log(n)
+    ln = y*betanull$par - n*log(exp(betanull$par) + 1)
+    lp = y * X %*% beta$par - n * log(exp(X %*% beta$par) + 1)
 
-    est = list(terms = terms, mf=mf, y = y, x = X, model = mf,
+    dev_residuals = sign(y - exp(X %*% beta$par) / (1 + exp(X %*% beta$par)))*sqrt(2*(ls-lp))
+    res_deviance = 2*sum(ls - lp)
+    res_df = dim(X)[1] - length(beta$par)
+    null_deviance = 2*sum(ls - ln)
+    AIC = 2*length(beta$par) - 2*sum(lp + lfactorial(n) - lfactorial(y) - lfactorial(n-y))
+
+    if (attr(terms,"intercept") == 1){
+      null_df = dim(X)[1] - 1
+    } else {
+      null_df = dim(X)[1]
+    }
+
+    est = list(terms = terms, mf = mf, y = y, x = X, model = mf,
                coefficients = beta$par, beta_cov = solve(-beta$hessian),
                res_df = res_df, null_deviance = null_deviance,
-               res_deviance = res_deviance, AIC = AIC, family=family,
-               dev_residuals = dev_residuals, null_df = null_df, data = data,
-               yhat = yhat, yres = yres)
+               res_deviance = res_deviance, AIC = AIC, family = family,
+               dev_residuals = dev_residuals, null_df = null_df, data = data)
 
   }
+
+  est$call = match.call()
+  est$formula = formula
+  class(est) = 'myglm'
+  return(est)
+
 }
 
 print.myglm = function(object, ...){
@@ -121,6 +123,14 @@ print.myglm = function(object, ...){
     }
   else if (object$family == "gaussian") {
     cat(x$coefficients[,])
+  }
+  else if (object$family == "binomial"){
+    frame = data.frame(t(object$coefficients), row.names=''); colnames(frame) <- attr(object$x,"dimnames")[[2]]
+    print(frame, right = FALSE, digits = 4)
+    cat('\n')
+    cat('Degrees of Freedom: ', object$null_df, ' Total (i.e. Null);  ', object$res_df, 'Residual \n')
+    cat('Null deviance: ', object$null_deviance, '\n')
+    cat('Residual deviance: ', object$res_deviance, '\t AIC: ', object$AIC)
   }
 }
 
