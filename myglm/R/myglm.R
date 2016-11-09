@@ -44,10 +44,10 @@ myglm = function(formula, data = list(), family, ...){
     ln = (y * (offset + betanull$par) - exp(offset + betanull$par))
     lp = (y * (offset + X %*% beta$par) - exp(offset + X %*% beta$par))
 
-    null_deviance = 2*sum(ls - ln);   res_deviance = 2*sum(ls - lp)
+    null_deviances = 2*sum(ls - ln);   residuals = 2*sum(ls - lp)
     res_df = dim(X)[1] - length(beta$par)
     AIC = 2*length(beta$par) - 2*sum(lp - lfactorial(y))
-    dev_residuals = sign(y - exp(offset + X %*% beta$par)) * sqrt(2*(ls - lp))
+    deviances = sign(y - exp(offset + X %*% beta$par)) * sqrt(2*(ls - lp))
 
     if (attr(terms,"intercept") == 1){
       null_df = dim(X)[1] - 1
@@ -58,16 +58,15 @@ myglm = function(formula, data = list(), family, ...){
     yres = y - exp(yhat)
       est = list(terms = terms, mf=mf, y = y, x = X, model = mf, offset = offset,
                coefficients = beta$par, beta_cov = solve(-beta$hessian),
-               res_df = res_df, null_deviance = null_deviance,
-               res_deviance = res_deviance, AIC = AIC, family=family,
-               dev_residuals = dev_residuals, null_df = null_df, data = data,
+               res_df = res_df, null_deviances = null_deviances,
+               residuals = residuals, AIC = AIC, family=family,
+               deviances = deviances, null_df = null_df, data = data,
                yhat = yhat, yres = yres)
   }
   else if(family == "binomial"){
     loglik = function(beta, X, n, y){
-      return (sum(y * X %*% beta - n*log(1 + exp(X%*%beta)) ))
+      return (sum(y * X %*% beta - n*log(1 + exp(X%*%beta))))
     }
-    #What is n in the model number of grouped data
     n = matrix(rowSums(y))
     if (dim(y)[2] != 1){
       ratios = matrix(y[,1]/rowSums(y))
@@ -78,14 +77,16 @@ myglm = function(formula, data = list(), family, ...){
     betanull = optim(par=numeric(1), fn = loglik, method="BFGS", hessian = TRUE,
                      control = list(fnscale=-1), X = matrix(numeric(length(y)) + 1), n = n, y = y)
 
-    ls = y*log(y) + (n - y)*log(n - y) - n*log(n)
-    ln = y*betanull$par - n*log(exp(betanull$par) + 1)
-    lp = y * X %*% beta$par - n * log(exp(X %*% beta$par) + 1)
+    #Det ovenfor stemmer overens med optim paa dbinom, saa ingen feil der
 
-    dev_residuals = sign(y - exp(X %*% beta$par) / (1 + exp(X %*% beta$par)))*sqrt(2*(ls-lp))
-    res_deviance = 2*sum(ls - lp)
+    ls = y*log(y) + (n - y)*log(n - y) - n*log(n);        ls[is.na(ls)] = 0
+    ln = y*betanull$par - n*log(exp(betanull$par) + 1)
+    lp = y*X %*% beta$par - n * log(exp(X %*% beta$par) + 1)
+
+    deviances = sign(ratios - exp(X %*% beta$par) / (1 + exp(X %*% beta$par)) ) * sqrt(2*(ls-lp))
+    residuals = 2*sum(ls - lp)
     res_df = dim(X)[1] - length(beta$par)
-    null_deviance = 2*sum(ls - ln)
+    null_deviances = 2*sum(ls - ln)
     AIC = 2*length(beta$par) - 2*sum(lp + lfactorial(n) - lfactorial(y) - lfactorial(n-y))
 
     if (attr(terms,"intercept") == 1){
@@ -94,11 +95,12 @@ myglm = function(formula, data = list(), family, ...){
       null_df = dim(X)[1]
     }
 
-    est = list(terms = terms, mf = mf, y = y, x = X, model = mf,
-               coefficients = beta$par, beta_cov = solve(-beta$hessian),
-               res_df = res_df, null_deviance = null_deviance,
-               res_deviance = res_deviance, AIC = AIC, family = family,
-               dev_residuals = dev_residuals, null_df = null_df, data = data)
+    est = list(terms = terms, mf = mf, y = y, ratios = ratios,
+               x = X, model = mf, coefficients = beta$par,
+               beta_cov = solve(-beta$hessian), res_df = res_df,
+               null_deviances = null_deviances,
+               residuals = residuals, AIC = AIC, family = family,
+               deviances = deviances, null_df = null_df, data = data)
 
   }
 
@@ -118,8 +120,8 @@ print.myglm = function(object, ...){
     print(frame, right = FALSE, digits = 4)
     cat('\n')
     cat('Degrees of Freedom: ', object$null_df, ' Total (i.e. Null);  ', object$res_df, 'Residual \n')
-    cat('Null deviance: ', object$null_deviance, '\n')
-    cat('Residual deviance: ', object$res_deviance, '\t AIC: ', object$AIC)
+    cat('Null deviance: ', object$null_deviances, '\n')
+    cat('Residual deviance: ', object$residuals, '\t AIC: ', object$AIC)
     }
   else if (object$family == "gaussian") {
     cat(x$coefficients[,])
@@ -129,8 +131,8 @@ print.myglm = function(object, ...){
     print(frame, right = FALSE, digits = 4)
     cat('\n')
     cat('Degrees of Freedom: ', object$null_df, ' Total (i.e. Null);  ', object$res_df, 'Residual \n')
-    cat('Null deviance: ', object$null_deviance, '\n')
-    cat('Residual deviance: ', object$res_deviance, '\t AIC: ', object$AIC)
+    cat('Null deviance: ', object$null_deviances, '\n')
+    cat('Residual deviance: ', object$residuals, '\t AIC: ', object$AIC)
   }
 }
 
@@ -168,7 +170,7 @@ summary.myglm = function(object, ...){
   }
   else if (object$family == "poisson") {
 
-    coefficients = as.array(object$coefficients); dev_residuals = object$dev_residuals
+    coefficients = as.array(object$coefficients); deviances = object$deviances
     std_error = z_value = z_score = numeric(length(coefficients))
 
     std_error = sqrt(diag(object$beta_cov))
@@ -180,8 +182,8 @@ summary.myglm = function(object, ...){
     cat("Call: \n")
     print(object$call)
     cat('\n Deviance Residuals: \n')
-    frame = data.frame(min(dev_residuals), quantile(dev_residuals, 0.25), median(dev_residuals),
-                       quantile(dev_residuals, 0.75), max(dev_residuals), row.names = '')
+    frame = data.frame(min(deviances), quantile(deviances, 0.25), median(deviances),
+                       quantile(deviances, 0.75), max(deviances), row.names = '')
     colnames(frame) <- c('Min','1stQ','Median','3rdQ','Max')
     print(frame, digits = 5)
     cat("\n Coefficients: \n")
@@ -189,8 +191,8 @@ summary.myglm = function(object, ...){
     colnames(frame) <- c('Estimate','Std. Error','Z-value','Z-score')
     print(frame, digits=5)
     cat('--- \n')
-    cat("Null deviance: ", object$null_deviance, " on ", object$null_df, " degrees of freedom \n")
-    cat("Residual deviance: ", object$res_deviance, " on ", object$res_df, " degrees of freedom \n")
+    cat("Null deviance: ", object$null_deviances, " on ", object$null_df, " degrees of freedom \n")
+    cat("Residual deviance: ", object$residuals, " on ", object$res_df, " degrees of freedom \n")
     cat("AIC: ", object$AIC)
   }
 }
@@ -317,8 +319,8 @@ anova.myglm = function(object, ...){
         }
 
       }
-      dev_resid[1] = object$null_deviance
-      dev_resid[numComp + 1] = model[[numComp]]$res_deviance
+      dev_resid[1] = object$null_deviances
+      dev_resid[numComp + 1] = model[[numComp]]$residuals
 
       factors_combi <- attr(model[[numComp]]$terms,"factors")[,numComp]
       if(sum(factors_combi) > 1){
