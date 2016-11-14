@@ -1,4 +1,5 @@
 data = read.table("https://www.math.ntnu.no/emner/TMA4315/2016h/Assignment3/wikimountains.txt",header=TRUE)
+library(plot3D)
 
 myglm = function(formula, data = list(), family, ...){
   # Extract model matrix & responses
@@ -68,20 +69,22 @@ myglm = function(formula, data = list(), family, ...){
       return (sum(y * X %*% beta - n*log(1 + exp(X%*%beta))))
     }
     n = matrix(rowSums(y))
-    if (dim(y)[2] != 1){
-      ratios = matrix(y[,1]/rowSums(y))
-    }
+    ratios = matrix(y[,1]/rowSums(y))
     y = matrix(y[,1])
-    beta = optim(par = numeric(dim(X)[2]), fn = loglik, method="BFGS", hessian = TRUE,
+  
+    beta = optim(par = numeric(dim(X)[2]), fn = loglik, method="Nelder-Mead", hessian = TRUE,
                  control = list(fnscale=-1), X = X, n = n, y = y)
-    betanull = optim(par=numeric(1), fn = loglik, method="BFGS", hessian = TRUE,
-                     control = list(fnscale=-1), X = matrix(numeric(length(y)) + 1), n = n, y = y)
-
-    #Det ovenfor stemmer overens med optim paa dbinom, saa ingen feil der
+    #Gir oss feil Hessian matrix
+    if (attr(terms,"intercept") == 1){
+      betanull = optim(par=numeric(1), fn = loglik, method="BFGS", hessian = TRUE,
+                       control = list(fnscale=-1), X = matrix(numeric(length(y)) + 1), n = n, y = y)
+    } else {
+      betanull = list(par=0)
+    }
 
     ls = y*log(y) + (n - y)*log(n - y) - n*log(n);        ls[is.na(ls)] = 0
-    ln = y*betanull$par - n*log(exp(betanull$par) + 1)
-    lp = y*X %*% beta$par - n * log(exp(X %*% beta$par) + 1)
+    ln = y*betanull$par - n*log(1 + exp(betanull$par))
+    lp = y*X %*% beta$par - n * log(1 + exp(X %*% beta$par))
 
     deviances = sign(ratios - exp(X %*% beta$par) / (1 + exp(X %*% beta$par)) ) * sqrt(2*(ls-lp))
     residuals = 2*sum(ls - lp)
@@ -102,6 +105,12 @@ myglm = function(formula, data = list(), family, ...){
                residuals = residuals, AIC = AIC, family = family,
                deviances = deviances, null_df = null_df, data = data)
 
+  }
+  else if(family == "geometric"){
+    print(length(y))
+    print(dim(X))
+    #initial_z = log(y + 0.5) - log(n - y + 0.5)
+    #initial_beta = solve(t(X) %*% X) %*% t(X) %*% initial_z
   }
 
   est$call = match.call()
@@ -149,7 +158,6 @@ summary.myglm = function(object, ...){
   chi_p_value = 1 - pchisq(chi_stat, p)
   chi_p_value[chi_p_value < 2e-16] <- '< 2e-16';   z_score[z_score < 2e-16] <- '< 2e-16'
 
-
   options(scipen=0)
   cat("Call: \n")
   print(object$call)
@@ -168,7 +176,7 @@ summary.myglm = function(object, ...){
   cat("'Chi2'-statistic: ", round(chi_stat,3), " on ", p, "DF,  p-value: ", chi_p_value)
 
   }
-  else if (object$family == "poisson") {
+  else if (object$family == "poisson" || object$family == "binomial") {
 
     coefficients = as.array(object$coefficients); deviances = object$deviances
     std_error = z_value = z_score = numeric(length(coefficients))
@@ -203,7 +211,22 @@ plot.myglm = function(object, ...){
   }
   else if (object$family == "poisson"){
     colors <- 1:(max(object$y)+1)
-    plot(x=object$yhat, y=object$yres, col=colors[object$y+1], main="Residuals v. Fitted")
+plot(x=object$yhat, y=object$yres, col=colors[object$y+1], main="Residuals v. Fitted")
+  }
+  else if (object$family == "binomial"){
+    par = object$coefficients
+    mesh = mesh(seq(min(object$mf$height),max(object$mf$height),500),
+                seq(min(object$mf$prominence),max(object$mf$prominence),500))
+    height = mesh$x
+    prominence = mesh$y
+    intercept_bool <- attr(object$terms, "intercept")
+    if(intercept_bool)
+      intercept = par[1] 
+      
+    fitted_values = exp(intercept + height*par[intercept_bool + 1] + prominence*par[intercept_bool + 2]) /
+      (1 + exp(intercept + height*par[intercept_bool + 1] + prominence*par[intercept_bool + 2]))
+    surf3D(x = height, y = prominence, z = fitted_values, colkey=FALSE, bty="b2", main="Regressed prob. of successful attempt",
+           phi = 20, theta = 130, zlim=c(0,1), xlab='Height',ylab='Prominence',zlab='Probability of success')
   }
 }
 
@@ -276,9 +299,9 @@ anova.myglm = function(object, ...){
   cat(c('Response: ', response, '\n'), sep='')
   print(frame)
   cat('--- \n')}
-  else if (object$family == "poisson"){
+  else if (object$family == "poisson" || object$family == "binomial"){
     comp = attr(object$terms, "term.labels")
-    dof_resid = dev_resid = numeric(length(comp)+1)
+    dof_resid = deviances = numeric(length(comp)+1)
     dev = dof = numeric(length(comp))
 
     # Name of response
@@ -288,7 +311,6 @@ anova.myglm = function(object, ...){
     model = list()
     extra <- 0
     offset <- attr(object$terms,"offset")
-
     if (!is.null(offset)){
       txtFormula = paste(txtFormula, rownames(attr(object$terms,"factors"))[offset])
     }
@@ -305,8 +327,13 @@ anova.myglm = function(object, ...){
       }
       formula = formula(txtFormula)
 
-      model[[numComp]] = myglm(formula=formula, data = object$data, family="poisson")
-
+      if (object$family == "poisson" ){
+        model[[numComp]] = myglm(formula=formula, data = object$data, family="poisson")
+        link = "log"
+      } else if (object$family == "binomial"){
+        model[[numComp]] = myglm(formula=formula, data = object$data, family="binomial")
+        link = "logit"
+      }
       intercept_bool <- attr(object$terms, "intercept")
       num_levels <- length(levels(model[[numComp]]$model[[comp[numComp]]]))
 
@@ -319,8 +346,8 @@ anova.myglm = function(object, ...){
         }
 
       }
-      dev_resid[1] = object$null_deviances
-      dev_resid[numComp + 1] = model[[numComp]]$residuals
+      deviances[1] = object$null_deviances
+      deviances[numComp + 1] = model[[numComp]]$residuals
 
       factors_combi <- attr(model[[numComp]]$terms,"factors")[,numComp]
       if(sum(factors_combi) > 1){
@@ -344,16 +371,16 @@ anova.myglm = function(object, ...){
     }
     dof_resid[1] = object$null_df
     for (i in 1:length(dof)){
-      dev[i] = dev_resid[i] - dev_resid[i+1]
+      dev[i] = deviances[i] - deviances[i+1]
       dof_resid[1 + i] = dof_resid[i] - dof[i]
     }
 
-    frame = data.frame(c('', dof), c('', round(dev)), dof_resid, dev_resid)
+    frame = data.frame(c('', dof), c('', round(dev)), dof_resid, deviances)
     colnames(frame) <- c('Df', 'Deviance', 'Resid. Df', 'Resid. Dev')
     rownames(frame) <- c('NULL', comp)
 
     cat('Analysis of Deviance Table \n \n')
-    cat('Model: ', object$family, ' link: log \n \n')#link)
+    cat('Model: ', object$family, ' link: ',link, '\n \n')
     cat('Response: ', rownames(attr(object$terms,"factors"))[1], '\n \n')
     cat('Terms added sequentially (first to last) \n \n \n')
     print(frame, digits = 1)
