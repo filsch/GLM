@@ -1,4 +1,4 @@
-data = read.table("https://www.math.ntnu.no/emner/TMA4315/2016h/Assignment3/wikimountains.txt",header=TRUE)
+#data = read.table("https://www.math.ntnu.no/emner/TMA4315/2016h/Assignment3/wikimountains.txt",header=TRUE)
 library(plot3D)
 
 myglm = function(formula, data = list(), family, ...){
@@ -42,7 +42,7 @@ myglm = function(formula, data = list(), family, ...){
       betanull = list(par=0)
     }
     ls = (y * log(y) - y)
-    ln = (y * (offset + betanull$par) - exp(offset + betanull$par))
+    ln = (y * (offset + as.numeric(betanull$par)) - exp(offset + as.numeric(betanull$par)))
     lp = (y * (offset + X %*% beta$par) - exp(offset + X %*% beta$par))
 
     null_deviances = 2*sum(ls - ln);   residuals = 2*sum(ls - lp)
@@ -64,26 +64,28 @@ myglm = function(formula, data = list(), family, ...){
                deviances = deviances, null_df = null_df, data = data,
                yhat = yhat, yres = yres)
   }
-  else if(family == "binomial"){
-    loglik = function(beta, X, n, y){
-      return (sum(y * X %*% beta - n*log(1 + exp(X%*%beta))))
-    }
+  else if(family == "binomial" || family == "geometric"){
+    if (family == "geometric"){
+      n = numeric(length(y)) + 1
+    } else {
     n = matrix(rowSums(y))
     ratios = matrix(y[,1]/rowSums(y))
     y = matrix(y[,1])
+    }
   
-    beta = optim(par = numeric(dim(X)[2]), fn = loglik, method="Nelder-Mead", hessian = TRUE,
-                 control = list(fnscale=-1), X = X, n = n, y = y)
-    #Gir oss feil Hessian matrix
+    beta = IRLS(n, y, X)
+    
     if (attr(terms,"intercept") == 1){
-      betanull = optim(par=numeric(1), fn = loglik, method="BFGS", hessian = TRUE,
-                       control = list(fnscale=-1), X = matrix(numeric(length(y)) + 1), n = n, y = y)
+      betanull = IRLS(n, y, numeric(length(y)) + 1)
+      null_df = dim(X)[1] - 1
+      
     } else {
       betanull = list(par=0)
+      null_df = dim(X)[1]
     }
-
+    
     ls = y*log(y) + (n - y)*log(n - y) - n*log(n);        ls[is.na(ls)] = 0
-    ln = y*betanull$par - n*log(1 + exp(betanull$par))
+    ln = y*as.numeric(betanull$par) - n*log(1 + exp(as.numeric(betanull$par)))
     lp = y*X %*% beta$par - n * log(1 + exp(X %*% beta$par))
 
     deviances = sign(ratios - exp(X %*% beta$par) / (1 + exp(X %*% beta$par)) ) * sqrt(2*(ls-lp))
@@ -92,32 +94,19 @@ myglm = function(formula, data = list(), family, ...){
     null_deviances = 2*sum(ls - ln)
     AIC = 2*length(beta$par) - 2*sum(lp + lfactorial(n) - lfactorial(y) - lfactorial(n-y))
 
-    if (attr(terms,"intercept") == 1){
-      null_df = dim(X)[1] - 1
-    } else {
-      null_df = dim(X)[1]
-    }
-
     est = list(terms = terms, mf = mf, y = y, ratios = ratios,
                x = X, model = mf, coefficients = beta$par,
-               beta_cov = solve(-beta$hessian), res_df = res_df,
+               beta_cov = beta$covmatrix, res_df = res_df,
                null_deviances = null_deviances,
                residuals = residuals, AIC = AIC, family = family,
                deviances = deviances, null_df = null_df, data = data)
 
-  }
-  else if(family == "geometric"){
-    print(length(y))
-    print(dim(X))
-    #initial_z = log(y + 0.5) - log(n - y + 0.5)
-    #initial_beta = solve(t(X) %*% X) %*% t(X) %*% initial_z
   }
 
   est$call = match.call()
   est$formula = formula
   class(est) = 'myglm'
   return(est)
-
 }
 
 print.myglm = function(object, ...){
@@ -230,6 +219,7 @@ plot(x=object$yhat, y=object$yres, col=colors[object$y+1], main="Residuals v. Fi
   }
 }
 
+#HER ER DET EN FEIL. PROEV ANOVA UTEN INTERCEPT
 anova.myglm = function(object, ...){
   if (object$family == "gaussian"){
   comp = attr(object$terms, "term.labels")
@@ -385,4 +375,18 @@ anova.myglm = function(object, ...){
     cat('Terms added sequentially (first to last) \n \n \n')
     print(frame, digits = 1)
   }
+}
+
+IRLS = function(n, y, X){
+  z <- log(y + 0.5) - log(n - y + 0.5)
+  beta <- solve(t(X) %*% X) %*% t(X) %*% z
+  beta_prev = 10000000
+  epsilon = 0.001
+  while(sum(abs(beta - beta_prev)) > epsilon) {
+    eta <- X %*% beta;              mu <- (exp(eta) / (1 + exp(eta)))*n
+    W <- diag( as.numeric(mu*(n - mu)/n) );     z <- eta + n*(y - mu)/(mu*(n - mu))
+    beta_prev <- beta;              beta <- solve(t(X) %*% W %*% X) %*% t(X) %*% W %*% z
+  }
+  beta_covmatrix = solve(t(X) %*% W %*% X)
+  return (list(par = as.numeric(beta), covmatrix = beta_covmatrix))
 }
