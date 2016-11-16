@@ -25,7 +25,6 @@ cross_validation = function(nr_folds, price_missed_bad, price_missed_good, inter
           txtFormula = paste("Y", "~ - 1 +", sep = " ")
         }
         txtFormula = paste(txtFormula, paste(comp[combinations[,i]], collapse = "+"), sep = "")
-        print(txtFormula)
         n = n + 1
         cat(txtFormula, 'Model nr: ', n, '/', 2^(length(comp)) - 1, '\n')
         

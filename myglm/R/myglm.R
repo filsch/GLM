@@ -1,5 +1,5 @@
-#data = read.table("https://www.math.ntnu.no/emner/TMA4315/2016h/Assignment3/wikimountains.txt",header=TRUE)
-library(plot3D)
+data = read.table("https://www.math.ntnu.no/emner/TMA4315/2016h/Assignment3/wikimountains.txt",header=TRUE)
+#library(plot3D)
 
 myglm = function(formula, data = list(), family, ...){
   # Extract model matrix & responses
