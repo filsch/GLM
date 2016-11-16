@@ -16,20 +16,16 @@ cross_validation = function(nr_folds, price_missed_bad, price_missed_good, inter
   n = 0
   model_error_rates = numeric()
   if (brute){
-    if (intercept){
-      sep = ""
-    } else {
-      sep = "+"
-    }
     for (m in 1:length(comp)){
       combinations = combn(1:length(comp), m)
       for (i in 1:dim(combinations)[2]){
         if (intercept){
           txtFormula = paste("Y", "~", sep = " ")
         } else {
-          txtFormula = paste("Y", "~ -1+", sep = " ")
+          txtFormula = paste("Y", "~ - 1 +", sep = " ")
         }
-        txtFormula = paste(txtFormula, paste(comp[combinations[,i]], collapse = "+"), sep)
+        txtFormula = paste(txtFormula, paste(comp[combinations[,i]], collapse = "+"), sep = "")
+        print(txtFormula)
         n = n + 1
         cat(txtFormula, 'Model nr: ', n, '/', 2^(length(comp)) - 1, '\n')
         
