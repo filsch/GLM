@@ -62,7 +62,7 @@ myglm = function(formula, data = list(), family, ...){
                res_df = res_df, null_deviances = null_deviances,
                residuals = residuals, AIC = AIC, family=family,
                deviances = deviances, null_df = null_df, data = data,
-               yhat = yhat, yres = yres)
+               yhat = yhat, yres = yres, iterations = "Not used")
   }
   else if(family == "binomial" || family == "geometric"){
     if (family == "geometric"){
@@ -99,7 +99,8 @@ myglm = function(formula, data = list(), family, ...){
                beta_cov = beta$covmatrix, res_df = res_df,
                null_deviances = null_deviances,
                residuals = residuals, AIC = AIC, family = family,
-               deviances = deviances, null_df = null_df, data = data)
+               deviances = deviances, null_df = null_df, data = data,
+               iterations = beta$iterations)
 
   }
 
@@ -190,7 +191,8 @@ summary.myglm = function(object, ...){
     cat('--- \n')
     cat("Null deviance: ", object$null_deviances, " on ", object$null_df, " degrees of freedom \n")
     cat("Residual deviance: ", object$residuals, " on ", object$res_df, " degrees of freedom \n")
-    cat("AIC: ", object$AIC)
+    cat("AIC: ", object$AIC, '\n \n')
+    cat('Number of IRLS iterations:', object$iterations)
   }
 }
 
@@ -378,15 +380,17 @@ anova.myglm = function(object, ...){
 }
 
 IRLS = function(n, y, X){
+  iter = 0
   z <- log(y + 0.5) - log(n - y + 0.5)
   beta <- solve(t(X) %*% X) %*% t(X) %*% z
   beta_prev = 10000000
   epsilon = 0.001
   while(sum(abs(beta - beta_prev)) > epsilon) {
+    iter = iter + 1
     eta <- X %*% beta;              mu <- (exp(eta) / (1 + exp(eta)))*n
     W <- diag( as.numeric(mu*(n - mu)/n) );     z <- eta + n*(y - mu)/(mu*(n - mu))
     beta_prev <- beta;              beta <- solve(t(X) %*% W %*% X) %*% t(X) %*% W %*% z
   }
   beta_covmatrix = solve(t(X) %*% W %*% X)
-  return (list(par = as.numeric(beta), covmatrix = beta_covmatrix))
+  return (list(par = as.numeric(beta), covmatrix = beta_covmatrix, iterations = iter))
 }
